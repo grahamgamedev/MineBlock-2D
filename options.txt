@@ -1,0 +1,25 @@
+# This file is used to configure MineBlock 2D
+
+# Sky color
+SKY = (135, 206, 250)
+#SKY = (100, 106, 150)
+
+# Font and size
+FONT = "Arial Black.ttf"
+FONT_SIZE = 16
+
+# Window size
+SCREEN_WIDTH = 1200
+SCREEN_HEIGHT = 600
+
+# Skin filename
+SKIN = "Default_skin.png"
+
+# Texture pack folder
+PACK = "Default"
+
+# Debug info
+DEBUG = False
+
+# Show HUD
+SHOW_HUD = True
