@@ -774,15 +774,24 @@ class HUD():
         for i, b in enumerate(self.content[3]):
             if b[0] == x and b[1] == y:
                 if self.content[3][i][2] == 0:
-                    if self.held[3] != 0:
-                        self.content[3][i][2:] = self.held[2:]
-                        self.rm_block(self.held[3])
+                    if self.held[3] != 0:       
+                        if CTRL:
+                            self.content[3][i][2] = self.held[2]
+                            self.content[3][i][3] = 1
+                            self.rm_block(1)
+                        else:
+                            self.content[3][i][2:] = self.held[2:]
+                            self.rm_block(self.held[3])
                         
-                if self.content[3][i][2] == self.held[2]:
+                elif self.content[3][i][2] == self.held[2]:
                     if self.held[3] != 0:
                         if self.content[3][i][3] + self.held[3] <= 64:
-                            self.content[3][i][3] += self.held[3]
-                            self.rm_block(self.held[3])
+                            if CTRL:
+                                self.content[3][i][3] += 1
+                                self.rm_block(1)
+                            else:
+                                self.content[3][i][3] += self.held[3]
+                                self.rm_block(self.held[3])
         if CHEST:
             self.chest()
         if FURNACE:
@@ -799,9 +808,15 @@ class HUD():
                 if type(self.content[3][i][3]) == float:
                     self.content[3][i][3] = math.floor(self.content[3][i][3])
                 if self.content[3][i][2] != 0:
-                    for item in range(self.content[3][i][3]):
-                        self.add_block(self.content[3][i][2])
-                    self.content[3][i][2:] = [0,0]
+                    if CTRL:
+                       self.add_block(self.content[3][i][2])
+                       self.content[3][i][3] -= 1
+                       if self.content[3][i][3] <= 0:
+                           self.content[3][i][2] = 0
+                    else:
+                        for item in range(self.content[3][i][3]):
+                            self.add_block(self.content[3][i][2])
+                        self.content[3][i][2:] = [0,0]
         if CHEST:
             self.chest()
         if FURNACE:
@@ -887,6 +902,7 @@ def main(world_name):
     global FURNACE; FURNACE = False
     global SHOW_HUD
     global DEBUG
+    global CTRL; CTRL = False
     
     # Create the player
     global player; player = Player(hud)
@@ -951,6 +967,9 @@ def main(world_name):
                     current_level.save()
                 if event.key == pygame.K_DELETE:
                     hud.delete()
+
+                if event.key == pygame.K_LCTRL:
+                    CTRL = True
                     
                 if event.key == pygame.K_1:
                     hud.change(1)
@@ -976,6 +995,9 @@ def main(world_name):
                     player.stop()
                 if event.key == pygame.K_RIGHT or event.key == pygame.K_d and player.acceleration_x > 0:
                     player.stop()
+                    
+                if event.key == pygame.K_LCTRL:
+                    CTRL = False
                     
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:

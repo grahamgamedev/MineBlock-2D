@@ -1,5 +1,5 @@
 #define MyAppName "MineBlock 2D"
-#define MyAppVersion "1.3.2"
+#define MyAppVersion "1.4.0"
 #define MyAppPublisher "MineBlock 2D Dev Team"
 #define MyAppURL "http://mineblock2d.ml/"
 #define MyAppExeName "MineBlock 2D.exe"

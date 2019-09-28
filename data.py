@@ -1,7 +1,7 @@
 # Block properties
 # bid:[plant, brakeable, bid to get, bid to smelt, fuel]
 block_types = {1:[False,True,1,0,0], 2:[False,True,2,0,0], 3:[False,True,3,0,0],
-               5:[False,False,0,0,0], 6:[False,True,6,0,64], 7:[False,True,7,202,0],
+               4:[False,False,0,0,0], 5:[False,False,0,0,0], 6:[False,True,6,0,64], 7:[False,True,7,202,0],
                8:[False,True,8,203,0], 9:[False,True,9,10,0], 10:[False,True,10,0,8],
                11:[False,True,107,0,1], 12:[False,True,105,0,2], 13:[False,True,105,0,2],
                14:[False,True,14,202,0], 15:[False,True,15,203,0],

@@ -61,9 +61,9 @@ class Window(Frame):
     def refresh(self):
         worlds = os.listdir("Worlds")
         if len(worlds) >= 1:
-            button = Button(self, text=worlds[0][0:-5], width=50, command=World.world0)
+            button = Button(self, text=worlds[0][0:-5], width=50, command=lambda: World.start_world(0))
             button.place(x=0, y=50)
-            button = Button(self, text="Delete", width=6, command=World.delete0)
+            button = Button(self, text="Delete", width=6, command=lambda: World.delete_world(0))
             button.place(x=350, y=50)
         else:
             button = Button(self, width=50)
@@ -72,9 +72,9 @@ class Window(Frame):
             button.place(x=350, y=50)
             
         if len(worlds) >= 2:
-            button = Button(self, text=worlds[1][0:-5], width=50, command=World.world1)
+            button = Button(self, text=worlds[1][0:-5], width=50, command=lambda: World.start_world(1))
             button.place(x=0, y=80)
-            button = Button(self, text="Delete", width=6, command=World.delete1)
+            button = Button(self, text="Delete", width=6, command=lambda: World.delete_world(1))
             button.place(x=350, y=80)
         else:
             button = Button(self, width=50)
@@ -83,9 +83,9 @@ class Window(Frame):
             button.place(x=350, y=80)
             
         if len(worlds) >= 3:
-            button = Button(self, text=worlds[2][0:-5], width=50, command=World.world2)
+            button = Button(self, text=worlds[2][0:-5], width=50, command=lambda: World.start_world(2))
             button.place(x=0, y=110)
-            button = Button(self, text="Delete", width=6, command=World.delete2)
+            button = Button(self, text="Delete", width=6, command=lambda: World.delete_world(2))
             button.place(x=350, y=110)
         else:
             button = Button(self, width=50)
@@ -94,9 +94,9 @@ class Window(Frame):
             button.place(x=350, y=110)
             
         if len(worlds) >= 4:
-            button = Button(self, text=worlds[3][0:-5], width=50, command=World.world3)
+            button = Button(self, text=worlds[3][0:-5], width=50, command=lambda: World.start_world(3))
             button.place(x=0, y=140)
-            button = Button(self, text="Delete", width=6, command=World.delete3)
+            button = Button(self, text="Delete", width=6, command=lambda: World.delete_world(3))
             button.place(x=350, y=140)
         else:
             button = Button(self, width=50)
@@ -105,9 +105,9 @@ class Window(Frame):
             button.place(x=350, y=140)
             
         if len(worlds) >= 5:
-            button = Button(self, text=worlds[4][0:-5], width=50, command=World.world4)
+            button = Button(self, text=worlds[4][0:-5], width=50, command=lambda: World.start_world(4))
             button.place(x=0, y=170)
-            button = Button(self, text="Delete", width=6, command=World.delete4)
+            button = Button(self, text="Delete", width=6, command=lambda: World.delete_world(4))
             button.place(x=350, y=170)
         else:
             button = Button(self, width=50)
@@ -116,9 +116,9 @@ class Window(Frame):
             button.place(x=350, y=170)
             
         if len(worlds) >= 6:
-            button = Button(self, text=worlds[5][0:-5], width=50, command=World.world5)
+            button = Button(self, text=worlds[5][0:-5], width=50, command=lambda: World.start_world(5))
             button.place(x=0, y=200)
-            button = Button(self, text="Delete", width=6, command=World.delete5)
+            button = Button(self, text="Delete", width=6, command=lambda: World.delete_world(5))
             button.place(x=350, y=200)
         else:
             button = Button(self, width=50)
@@ -198,38 +198,6 @@ class World():
         else:
             label = Label(self.root, text="World allredy exists.")
             label.place(x=50, y=30)
-        
-                  
-    # Load and delete commands for each world
-    def world0():
-        World.start_world(0)
-    def delete0():
-        World.delete_world(0)
-        
-    def world1():
-        World.start_world(1)
-    def delete1():
-        World.delete_world(1)
-        
-    def world2():
-        World.start_world(2)
-    def delete2():
-        World.delete_world(2)
-        
-    def world3():
-        World.start_world(3)
-    def delete3():
-        World.delete_world(3)
-        
-    def world4():
-        World.start_world(4)
-    def delete4():
-        World.delete_world(4)
-        
-    def world5():
-        World.start_world(5)
-    def delete5():
-        World.delete_world(5)
 
 class Options(Frame):
     def start(self):
