@@ -18,6 +18,7 @@ cp Default_skin.png MineBlock\ 2D\ V$1/
 cp MineBlock\ 2D MineBlock\ 2D\ V$1/
 cp options.txt MineBlock\ 2D\ V$1/
 cp Readme.html MineBlock\ 2D\ V$1/
+cp LICENSE MineBlock\ 2D\ V$1/
 cp -R Texture\ Packs/ MineBlock\ 2D\ V$1/
 
 echo compressing

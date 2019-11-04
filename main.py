@@ -1,4 +1,5 @@
-import pygame, json, math, os, threading, data
+import pygame, json, math, os, threading
+import data, InputBox
 from random import randint
 from time import time
 
@@ -6,6 +7,7 @@ LOADERLOCK = threading.Lock()
 TEXTURES = {}
 with open("options.txt", "r") as f:
     exec(f.read())
+
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, hud):
@@ -18,8 +20,6 @@ class Player(pygame.sprite.Sprite):
         self.acceleration_x = 0
         self.acceleration_y = 0
  
-        # List of sprites we can bump against
-        self.level = None
         self.hud = hud
         self.facing = "RIGHT"
         
@@ -28,14 +28,14 @@ class Player(pygame.sprite.Sprite):
         self.calc_grav()
 
         # Void damage
-        if self.rect.y - VS > 5000:
+        if self.rect.y - self.world.vs > 5000:
             self.hud.health(-10)
  
         # Move left/right
         self.rect.x += self.acceleration_x
  
         # See if we hit anything
-        block_hit_list = pygame.sprite.spritecollide(self, self.level.forground_list, False)
+        block_hit_list = pygame.sprite.spritecollide(self, self.world.forground_list, False)
         for block in block_hit_list:
             # If we are moving right,
             # set our right side to the left side of the item we hit
@@ -49,7 +49,7 @@ class Player(pygame.sprite.Sprite):
         self.rect.y += self.acceleration_y
  
         # Check and see if we hit anything
-        block_hit_list = pygame.sprite.spritecollide(self, self.level.forground_list, False)
+        block_hit_list = pygame.sprite.spritecollide(self, self.world.forground_list, False)
         for block in block_hit_list:
             # Fall damage
             if self.acceleration_y > 1:
@@ -70,19 +70,15 @@ class Player(pygame.sprite.Sprite):
             self.acceleration_y = 1
         else:
             self.acceleration_y += 0.35
-        # See if we are on the ground.
-        if self.rect.y >= SCREEN_HEIGHT - self.rect.height and self.acceleration_y >= 0:
-            self.acceleration_y = 0
-            self.rect.y = SCREEN_HEIGHT - self.rect.height
             
     def jump(self):
         # move down a bit and see if there is a forground block below us.
         self.rect.y += 2
-        platform_hit_list = pygame.sprite.spritecollide(self, self.level.forground_list, False)
+        block_hit_list = pygame.sprite.spritecollide(self, self.world.forground_list, False)
         self.rect.y -= 2
  
         # If it is ok to jump, set our speed upwards
-        if len(platform_hit_list) > 0 or self.rect.bottom >= SCREEN_HEIGHT:
+        if len(block_hit_list) > 0 or self.rect.bottom >= SCREEN_HEIGHT:
             self.acceleration_y = -9
  
     # Player movement
@@ -95,33 +91,104 @@ class Player(pygame.sprite.Sprite):
     def stop(self):
         self.acceleration_x = 0
 
+
 class Block(pygame.sprite.Sprite):
-    def __init__(self, bid, scale=100):
+    def __init__(self, content, scale=100):
         super().__init__()
         global TEXTURES
-        
-        # Only load texture if it hasnt allredy been loaded
-        if bid not in TEXTURES.keys():
-            self.image = pygame.image.load(os.path.join("Texture Packs", PACK, str(bid) + ".png")).convert_alpha()
-            TEXTURES.__setitem__(bid, self.image)
+
+        # Define propertys
+        if type(content) == list:
+            self.x = content[0]
+            self.y = content[1]
+            self.bid = content[2]
+
+            # Gravity
+            self.grav_effected = False
+            if data.block_types[self.bid][3]:
+                self.grav_effected = True
+                self.acceleration_y = 0
+                self.world = None
+                self.rest = True
+                self.count = 0
         else:
-            self.image = TEXTURES[bid]
+            self.bid = content
+        
+        # Only load texture if it hasn't allredy been loaded
+        if self.bid not in TEXTURES.keys():
+            self.image = pygame.image.load(os.path.join("Texture Packs", PACK, str(self.bid) + ".png")).convert_alpha()
+            if self.bid != 117:
+                TEXTURES.__setitem__(self.bid, self.image)
+        else:
+            self.image = TEXTURES[self.bid]
             
         # Scale textures only if needed
         if scale != 100:
-            if bid == 105:
+            if self.bid == 105:
                 self.image = pygame.transform.scale(self.image, (int(scale / 2), scale))
             else:   
                 self.image = pygame.transform.scale(self.image, (scale, scale))
+                
+        # Render sign text
+        elif self.bid == 117:
+            self.myfont = pygame.font.Font(FONT, FONT_SIZE)
+            y = 20
+            for i in content[3].values():
+                if i != "":
+                    textsurface = self.myfont.render(i, False, (0, 0, 0))
+                    self.image.blit(textsurface,(10,y))
+                y += 24
+  
         self.rect = self.image.get_rect()
-            
-class world:
+
+    def update(self):
+        if self.grav_effected and self.world:
+            if not self.rest:
+
+                # Check and see if we hit anything
+                block_hit_list = pygame.sprite.spritecollide(self, self.world.forground_list, False)
+                block_hit_list += pygame.sprite.spritecollide(self, self.world.background_list, False)
+                if len(block_hit_list) == 1:
+                    if self.acceleration_y == 0:
+                        self.acceleration_y = 1
+                    else:
+                        self.acceleration_y += 0.35
+                    self.rect.y += self.acceleration_y
+                else:
+                    self.kill()
+                    for c in self.world.level:
+                        if c[0] in range(self.world.chleft, self.world.chright):
+                            for i, b in enumerate(c[1:]):
+                                if [self.x, self.y] == b[0:2]:
+                                    LOADERLOCK.acquire()
+                                    c.remove(b)
+                                    LOADERLOCK.release()
+                                    
+                    x = math.floor((self.rect.x - self.world.ws) / 100)
+                    y = math.floor((self.rect.y - self.world.vs) / 100)
+                    self.world.place_block(x, y, self.bid)
+            else:
+                # Check if at rest
+                if self.count == 30:
+                    self.count = 0
+                    self.rest = False
+
+                    for block in self.world.forground_list:
+                        if self.rect.x == block.rect.x:
+                            if self.rect.y + 100 == block.rect.y:
+                               self.rest = True
+                self.count += 1
+
+                     
+class World:
     def __init__(self, player, hud, world_name):
         self.forground_list = pygame.sprite.Group()
         self.background_list = pygame.sprite.Group()
+        
         self.world_name = world_name
         self.player = player
         self.hud = hud
+        
         self.world_shift = 0
         self.vworld_shift = 0
         self.grow_tick = 0
@@ -129,21 +196,24 @@ class world:
         # Load world
         with open(os.path.join("Worlds", self.world_name), "r") as f:
             d = json.loads(f.read())
-        global level; level = d["Level"]
-        global WS; WS = d["WS"]
-        global VS; VS = d["VS"]
-        player.rect.x = d["X"]
-        player.rect.y = d["Y"]
+        self.level = d["Level"]
+        self.ws = d["WS"]
+        self.vs = d["VS"]
+        
+        self.player.rect.x = d["X"]
+        self.player.rect.y = d["Y"]
         self.hud.hot = d["Hot"]
         self.hud.curent_health = d["Health"]
 
-        x = math.floor(-(WS - player.rect.x) / 100)
+        x = math.floor(-(self.ws - self.player.rect.x) / 100)
         self.chright = math.floor(x / 16)
         self.chleft = math.floor(x / 16)
         
         # Correct world shift      
-        self.shift_world(WS)
-        self.vshift_world(VS)
+        self.shift_world(self.ws)
+        self.vshift_world(self.vs)
+
+        # Load HUD
         self.hud.blocks()
         self.hud.health(0)
 
@@ -162,12 +232,13 @@ class world:
     def load(self):
         LOADERLOCK.acquire()
         if -128 <= CHUNK * 16 < 128:
-            for c in level:
+            for c in self.level:
                 if c[0] == CHUNK:
                     for b in c[1:]:
-                        block = Block(b[2])
-                        block.rect.x = b[0] * 100 + WS
-                        block.rect.y = b[1] * 100 + VS
+                        block = Block(b)
+                        block.world = self
+                        block.rect.x = b[0] * 100 + self.ws
+                        block.rect.y = b[1] * 100 + self.vs
                         if b[2] >= 100:
                             self.background_list.add(block)
                         else:
@@ -183,17 +254,17 @@ class world:
     def unload(self):
         LOADERLOCK.acquire()
         if -128 <= UNCHUNK * 16 < 128:
-            for c in level:
+            for c in self.level:
                 if c[0] == UNCHUNK:
                     for i, b in enumerate(c[1:]):
-                        for platform in self.forground_list:
-                            if b[0] * 100 + WS == platform.rect.x:
-                                if b[1] * 100 + VS == platform.rect.y:
-                                    self.forground_list.remove(platform)
-                        for platform in self.background_list:
-                            if b[0] * 100 + WS == platform.rect.x:
-                                if b[1] * 100 + VS == platform.rect.y:
-                                    self.background_list.remove(platform)
+                        for block in self.forground_list:
+                            if b[0] * 100 + self.ws == block.rect.x:
+                                if b[1] * 100 + self.vs == block.rect.y:
+                                    self.forground_list.remove(block)
+                        for block in self.background_list:
+                            if b[0] * 100 + self.ws == block.rect.x:
+                                if b[1] * 100 + self.vs == block.rect.y:
+                                    self.background_list.remove(block)
         self.save()
         LOADERLOCK.release()
         
@@ -205,16 +276,16 @@ class world:
  
     def shift_world(self, shift_x):
         self.world_shift += shift_x
-        global WS; WS = self.world_shift
+        self.ws = self.world_shift
  
         # Go through all the sprite lists and shift
-        for platform in self.forground_list:
-            platform.rect.x += shift_x
-        for platform in self.background_list:
-            platform.rect.x += shift_x
+        for block in self.forground_list:
+            block.rect.x += shift_x
+        for block in self.background_list:
+            block.rect.x += shift_x
 
         # Load extra chunks
-        x = math.floor(-(WS - player.rect.x) / 100)
+        x = math.floor(-(self.ws - self.player.rect.x) / 100)
         if (x + 13) / 16 == self.chright:
             self.thload(self.chright)
             self.chright += 1
@@ -228,18 +299,18 @@ class world:
 
     def vshift_world(self, shift_y):
         self.vworld_shift += shift_y
-        global VS; VS = self.vworld_shift
+        self.vs = self.vworld_shift
  
         # Go through all the sprite lists and shift
-        for platform in self.forground_list:
-            platform.rect.y += shift_y
-        for platform in self.background_list:
-            platform.rect.y += shift_y
+        for block in self.forground_list:
+            block.rect.y += shift_y
+        for block in self.background_list:
+            block.rect.y += shift_y
             
     def save(self):
         with open(os.path.join("Worlds", self.world_name), "w") as f:
-            f.write('{"Level":' + str(level) + ",\n")
-            f.write('"WS":' + str(WS) + ', "VS":' + str(VS) + ', "X":' + str(player.rect.x) + ', "Y":' + str(player.rect.y) + ", \n")
+            f.write('{"Level":' + json.dumps(self.level) + ",\n")
+            f.write('"WS":' + str(self.ws) + ', "VS":' + str(self.vs) + ', "X":' + str(self.player.rect.x) + ', "Y":' + str(self.player.rect.y) + ", \n")
             f.write('"Hot":' + str(self.hud.hot) + ', \n"Health":' + str(self.hud.curent_health) + '}')
             
     def draw(self, screen):
@@ -250,9 +321,12 @@ class world:
         self.forground_list.draw(screen)
 
     def update(self):
+        self.forground_list.update()
+        self.background_list.update()
+        
         if self.grow_tick >= 600:
             self.grow_tick = 0
-            for c in level:
+            for c in self.level:
                 if c[0] in range(self.chleft, self.chright):
                     for i, b in enumerate(c[1:]):
                         # sapling growth
@@ -266,27 +340,27 @@ class world:
                             fuel = b[3][2]
                             
                             if ore[2] != 0 and fuel[2] != 0:
-                                if data.block_types[ore[2]][3] != 0:
+                                if data.block_types[ore[2]][4] != 0:
                                     if ore[3] > 0 and out[3] < 64:
-                                        if data.block_types[fuel[2]][4] != 0:
-                                            if fuel[3] >= (1 / data.block_types[fuel[2]][4]):
+                                        if data.block_types[fuel[2]][5] != 0:
+                                            if fuel[3] >= (1 / data.block_types[fuel[2]][5]):
 
                                                 if out[2] == 0:
-                                                    out[2] = data.block_types[ore[2]][3]
+                                                    out[2] = data.block_types[ore[2]][4]
                                                 out[3] += 1
                                                 
                                                 ore[3] -= 1
                                                 if ore[3] <= 0:
                                                     ore[2] = 0
                                                     
-                                                fuel[3] -= (1 / data.block_types[fuel[2]][4])
+                                                fuel[3] -= (1 / data.block_types[fuel[2]][5])
                                                 if fuel[3] <= 0:
                                                     fuel[2] = 0
                             else:
                                 fuel[3] = math.floor(fuel[3])
                                 if fuel[3] <= 0:
                                     fuel[2] = 0
-                            if FURNACE:
+                            if self.hud.in_furnace:
                                 self.hud.furnace()
         self.grow_tick += 1
 
@@ -315,15 +389,47 @@ class world:
             self.place_block(x+1,y-3,101)
             self.place_block(x-1,y-3,101)
             self.place_block(x,y-4,101)
+                                
+    def sign(self):
+        myfont = pygame.font.Font(FONT, 20)
+        global screen
+        clock = pygame.time.Clock()
+        
+        input_box1 = InputBox.InputBox(200, 200, 100, 32, myfont)
+        input_box2 = InputBox.InputBox(200, 250, 100, 32, myfont)
+        input_box3 = InputBox.InputBox(200, 300, 100, 32, myfont)
+        input_boxes = [input_box1, input_box2, input_box3]
+        
+        done = False
+        backer = pygame.image.load(os.path.join("Texture Packs", PACK, "117.png")).convert()
+        backer = pygame.transform.scale(backer, (180, 180))
+
+        while not done:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    done = True
+            
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_RETURN or event.key == pygame.K_ESCAPE:
+                        return {"line1":input_box1.text, "line2":input_box2.text, "line3":input_box3.text}
+                for box in input_boxes:
+                    box.handle_event(event)
+
+            screen.blit(backer, (170,180))
+            for box in input_boxes:
+                box.draw(screen)
+            
+            pygame.display.flip()
+            clock.tick(30)
         
     def mine(self, x = None, y = None):
         get = False
         if x == None:
             pos = pygame.mouse.get_pos()
-            x = math.floor((pos[0] - WS) / 100)
-            y = math.floor((pos[1] - VS) / 100)
+            x = math.floor((pos[0] - self.ws) / 100)
+            y = math.floor((pos[1] - self.vs) / 100)
             get = True
-        for c in level:
+        for c in self.level:
             if c[0] in range(self.chleft, self.chright):
                 for i, b in enumerate(c[1:]):
                     if [x, y] == b[0:2]:
@@ -336,23 +442,22 @@ class world:
                             LOADERLOCK.acquire()
                             if prop[2] != 0 and get:
                                 self.hud.add_block(prop[2])
-                            level.remove(c)
+
                             c.remove(b)
-                            level.append(c)
-                            for platform in self.forground_list:
-                                if x * 100 + WS == platform.rect.x:
-                                    if y * 100 + VS == platform.rect.y:
-                                        self.forground_list.remove(platform)
-                            for platform in self.background_list:
-                                if x * 100 + WS == platform.rect.x:
-                                    if y * 100 + VS == platform.rect.y:
-                                        self.background_list.remove(platform)
+                            for block in self.forground_list:
+                                if x * 100 + self.ws == block.rect.x:
+                                    if y * 100 + self.vs == block.rect.y:
+                                        self.forground_list.remove(block)
+                            for block in self.background_list:
+                                if x * 100 + self.ws == block.rect.x:
+                                    if y * 100 + self.vs == block.rect.y:
+                                        self.background_list.remove(block)
                             LOADERLOCK.release()
         
     def place(self):
         pos = pygame.mouse.get_pos()
-        x = math.floor((pos[0] - WS) / 100)
-        y = math.floor((pos[1] - VS) / 100)
+        x = math.floor((pos[0] - self.ws) / 100)
+        y = math.floor((pos[1] - self.vs) / 100)
         bid = self.hud.held[2]
         get = True
         exist = False
@@ -363,8 +468,8 @@ class world:
 
         # Prevent block placement inside the player
         if bid < 100:
-            if x == round(-(WS - player.rect.x) / 100):
-                player_y = round(-(VS - player.rect.y) / 100)
+            if x == round(-(self.ws - self.player.rect.x) / 100):
+                player_y = round(-(self.vs - self.player.rect.y) / 100)
                 if y == player_y or y == player_y +1:
                     exist = True
         # prevent item placement
@@ -375,7 +480,7 @@ class world:
             exist = True
             plant = True
             
-        for c in level:
+        for c in self.level:
             for i, b in enumerate(c[3:]):          
                 if plant and [x, y +1] == b[0:2]:
                     if b[2] == 1 or b[2] == 2:
@@ -418,7 +523,6 @@ class world:
                     elif b[2] == 114:
                         exist = True
                         self.hud.crafting(data.anvil_recipies)
-                        global CRAFTING; CRAFTING = True
                         
                     else:
                         exist = True
@@ -432,20 +536,22 @@ class world:
         if not exist and bid != 0: 
             if get:
                 self.hud.rm_block(1)
-                if player.facing == "RIGHT" and bid == 105:
+                if self.player.facing == "RIGHT" and bid == 105:
                     bid = 106
-            for c in level:
+            for c in self.level:
                 if c[0] == math.floor(x / 16):
-                    level.remove(c)
                     if bid == 111:
-                        c.append([x, y, bid, time() + randint(60, 600)])
+                        bdt = [x, y, bid, time() + randint(60, 600)]
+                    elif bid == 117:
+                        bdt = [x, y, bid, self.sign()]
                     else:
-                        c.append([x, y, bid])
-                    level.append(c)
+                        bdt = [x, y, bid]
+                    c.append(bdt)
             
-            block = Block(bid)
-            block.rect.x = x * 100 + WS
-            block.rect.y = y * 100 + VS
+            block = Block(bdt)
+            block.world = self
+            block.rect.x = x * 100 + self.ws
+            block.rect.y = y * 100 + self.vs
             if bid >= 100:
                 self.background_list.add(block)
             else:
@@ -454,22 +560,21 @@ class world:
         
     def place_block(self, x, y, bid):
         exist = False
-        for c in level:
+        for c in self.level:
             for i, b in enumerate(c[3:]):          
                 if [x, y] == b[0:2]:
                     exist = True
                     
         if not exist:
             LOADERLOCK.acquire()
-            for c in level:
+            for c in self.level:
                 if c[0] == math.floor(x / 16):
-                    level.remove(c)
                     c.append([x, y, bid])
-                    level.append(c)
             
-            block = Block(bid)
-            block.rect.x = x * 100 + WS
-            block.rect.y = y * 100 + VS
+            block = Block([x, y, bid])
+            block.world = self
+            block.rect.x = x * 100 + self.ws
+            block.rect.y = y * 100 + self.vs
             if bid >= 100:
                 self.background_list.add(block)
             else:
@@ -483,6 +588,11 @@ class HUD():
         self.h = None 
         pygame.font.init()
         self.myfont = pygame.font.Font(FONT, FONT_SIZE)
+        self.ctrl = False
+
+        self.is_crafting = False
+        self.in_chest = False
+        self.in_furnace = False
         
     def blocks(self):
         self.hot_list1 = pygame.sprite.Group()
@@ -564,6 +674,7 @@ class HUD():
             self.health_list.add(block)
         
     def crafting(self, recipies):
+        self.is_crafting = True
         self.recipies = recipies
         self.crafting_list1 = pygame.sprite.Group()
         self.crafting_list2 = pygame.sprite.Group()
@@ -689,7 +800,7 @@ class HUD():
                 self.crafting(self.recipies)
 
     def chest(self):
-        global CHEST; CHEST = True
+        self.in_chest = True
         # Create new chest
         if len(self.content) == 3:
             self.content.append(data.chest)
@@ -723,7 +834,7 @@ class HUD():
         self.chesttext3 = self.myfont.render(text, False, (0, 0, 0))
 
     def furnace(self):
-        global FURNACE; FURNACE = True
+        self.in_furnace = True
         # Create new furnace
         if len(self.content) == 3:
             self.content.append(data.furnace)
@@ -749,10 +860,10 @@ class HUD():
         fuel = self.content[3][2]
         
         if ore[2] != 0 and fuel[2] != 0:
-            if data.block_types[ore[2]][3] != 0:
+            if data.block_types[ore[2]][4] != 0:
                 if ore[3] > 0 and out[3] < 64:
-                    if data.block_types[fuel[2]][4] != 0:
-                        if fuel[3] >= (1 / data.block_types[fuel[2]][4]):
+                    if data.block_types[fuel[2]][5] != 0:
+                        if fuel[3] >= (1 / data.block_types[fuel[2]][5]):
                             block = Block("Furnace2")
                             block.rect.x = 230
                             block.rect.y = 320
@@ -775,7 +886,7 @@ class HUD():
             if b[0] == x and b[1] == y:
                 if self.content[3][i][2] == 0:
                     if self.held[3] != 0:       
-                        if CTRL:
+                        if self.ctrl:
                             self.content[3][i][2] = self.held[2]
                             self.content[3][i][3] = 1
                             self.rm_block(1)
@@ -786,15 +897,15 @@ class HUD():
                 elif self.content[3][i][2] == self.held[2]:
                     if self.held[3] != 0:
                         if self.content[3][i][3] + self.held[3] <= 64:
-                            if CTRL:
+                            if self.ctrl:
                                 self.content[3][i][3] += 1
                                 self.rm_block(1)
                             else:
                                 self.content[3][i][3] += self.held[3]
                                 self.rm_block(self.held[3])
-        if CHEST:
+        if self.in_chest:
             self.chest()
-        if FURNACE:
+        if self.in_furnace:
             self.furnace()
 
     def get(self):
@@ -808,7 +919,7 @@ class HUD():
                 if type(self.content[3][i][3]) == float:
                     self.content[3][i][3] = math.floor(self.content[3][i][3])
                 if self.content[3][i][2] != 0:
-                    if CTRL:
+                    if self.ctrl:
                        self.add_block(self.content[3][i][2])
                        self.content[3][i][3] -= 1
                        if self.content[3][i][3] <= 0:
@@ -817,9 +928,9 @@ class HUD():
                         for item in range(self.content[3][i][3]):
                             self.add_block(self.content[3][i][2])
                         self.content[3][i][2:] = [0,0]
-        if CHEST:
+        if self.in_chest:
             self.chest()
-        if FURNACE:
+        if self.in_furnace:
             self.furnace()
                                     
     def draw(self, screen):
@@ -833,20 +944,20 @@ class HUD():
             screen.blit(self.debug,(0,100))
 
         # Draw any open GUIs
-        if CRAFTING:
+        if self.is_crafting:
             screen.blit(self.backer, (100,150))
             self.crafting_list1.draw(screen)
             self.crafting_list2.draw(screen)
             
             screen.blit(self.craftingtext,(110,480))
-        if CHEST:
+        if self.in_chest:
             screen.blit(self.backer, (100,250))
             self.chest_list.draw(screen)
             
             screen.blit(self.chesttext1,(110,290))
             screen.blit(self.chesttext2,(110,350))
             screen.blit(self.chesttext3,(110,410))
-        if FURNACE:
+        if self.in_furnace:
             screen.blit(self.backer, (100,250))
             self.furnace_list.draw(screen)
             
@@ -859,12 +970,12 @@ class HUD():
         if time() - self.before > 30 and self.curent_health < 10:
             self.health(1) 
         if DEBUG:
-            y = math.floor(-(VS - player.rect.y) / 100)
-            x = math.floor(-(WS - player.rect.x) / 100)
+            y = math.floor(-(self.world.vs - self.player.rect.y) / 100)
+            x = math.floor(-(self.world.ws - self.player.rect.x) / 100)
             text = " Player: X " + str(x) + "  Y " + str(y)
             pos = pygame.mouse.get_pos()
-            x = math.floor((pos[0] - WS) / 100)
-            y = math.floor((pos[1] - VS) / 100)
+            x = math.floor((pos[0] - self.world.ws) / 100)
+            y = math.floor((pos[1] - self.world.vs) / 100)
             text += "  Mouse: X " + str(x) + "  Y " + str(y)
             self.debug = self.myfont.render(text, False, (0, 0, 0))
     
@@ -880,6 +991,7 @@ def main(world_name):
 
     # Set the height and width of the screen
     size = (SCREEN_WIDTH, SCREEN_HEIGHT)
+    global screen
     screen = pygame.display.set_mode(size)
     ro = SCREEN_WIDTH - 150
     bo = SCREEN_HEIGHT - 150
@@ -897,21 +1009,19 @@ def main(world_name):
 
     # Load HUD
     hud = HUD()
-    global CRAFTING; CRAFTING = False
-    global CHEST; CHEST = False
-    global FURNACE; FURNACE = False
     global SHOW_HUD
     global DEBUG
-    global CTRL; CTRL = False
     
     # Create the player
-    global player; player = Player(hud)
+    player = Player(hud)
     active_sprite_list = pygame.sprite.Group()
     active_sprite_list.add(player)
+    hud.player = player
 
     # Load world
-    current_level = world(player, hud, world_name)
-    player.level = current_level
+    world = World(player, hud, world_name)
+    player.world = world
+    hud.world = world
 
     # Used to manage how fast the screen updates
     clock = pygame.time.Clock()
@@ -925,7 +1035,7 @@ def main(world_name):
                 done = True
 
             if event.type == pygame.KEYDOWN:
-                if not CRAFTING and not CHEST and not FURNACE:
+                if not hud.is_crafting and not hud.in_chest and not hud.in_furnace:
                     if event.key == pygame.K_LEFT or event.key == pygame.K_a:
                         player.go_left()
                     if event.key == pygame.K_RIGHT or event.key == pygame.K_d:
@@ -934,19 +1044,19 @@ def main(world_name):
                         player.jump()
                             
                 if event.key == pygame.K_e:
-                    if CRAFTING:
-                        CRAFTING = False
-                    elif not CHEST and not FURNACE:
+                    if hud.is_crafting:
+                        hud.is_crafting = False
+                    elif not hud.in_chest and not hud.in_furnace:
                         hud.crafting(data.crafting_recipies)
-                        CRAFTING = True
+
                         
                 if event.key == pygame.K_ESCAPE:
-                    if CRAFTING:
-                        CRAFTING = False
-                    elif CHEST:
-                        CHEST = False
-                    elif FURNACE:
-                        FURNACE = False
+                    if hud.is_crafting:
+                        hud.is_crafting = False
+                    elif hud.in_chest:
+                        hud.in_chest = False
+                    elif hud.in_furnace:
+                        hud.in_furnace = False
                     else:
                         done = True
                         
@@ -964,12 +1074,12 @@ def main(world_name):
                     else:
                         DEBUG = True
                 if event.key == pygame.K_F4:
-                    current_level.save()
+                    world.save()
                 if event.key == pygame.K_DELETE:
                     hud.delete()
 
                 if event.key == pygame.K_LCTRL:
-                    CTRL = True
+                    hud.ctrl = True
                     
                 if event.key == pygame.K_1:
                     hud.change(1)
@@ -997,21 +1107,21 @@ def main(world_name):
                     player.stop()
                     
                 if event.key == pygame.K_LCTRL:
-                    CTRL = False
+                    hud.ctrl = False
                     
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    if CRAFTING:
+                    if hud.is_crafting:
                         hud.craft()
-                    elif CHEST or FURNACE:
+                    elif hud.in_chest or hud.in_furnace:
                         hud.get()
                     else:
-                        current_level.mine()
+                        world.mine()
                 if event.button == 3:
-                    if CHEST or FURNACE:
+                    if hud.in_chest or hud.in_furnace:
                         hud.put()
-                    elif not CRAFTING:
-                        current_level.place()
+                    elif not hud.is_crafting:
+                        world.place()
                         
                 if event.button == 4:
                     if hud.h < 8:
@@ -1029,7 +1139,7 @@ def main(world_name):
         # Update HUD
         hud.update()
         # Update world
-        current_level.update()
+        world.update()
 
         # Check that the player is alive
         if hud.curent_health <= 0:
@@ -1040,28 +1150,28 @@ def main(world_name):
         if player.rect.right >= ro:
             diff = player.rect.right - ro
             player.rect.right = ro
-            current_level.shift_world(-diff)
+            world.shift_world(-diff)
 
         # If the player gets near the left side, shift the world right (+x)
         if player.rect.left <= 150:
             diff = 150 - player.rect.left
             player.rect.left = 150
-            current_level.shift_world(diff)
+            world.shift_world(diff)
 
         # If the player gets near the bottom side, shift the world up (-y)
         if player.rect.bottom >= bo:
             diff = player.rect.bottom - bo
             player.rect.bottom = bo
-            current_level.vshift_world(-diff)
+            world.vshift_world(-diff)
 
         # If the player gets near the top side, shift the world down (+y)
         if player.rect.top <= 150:
             diff = 150 - player.rect.top
             player.rect.top = 150
-            current_level.vshift_world(diff)
+            world.vshift_world(diff)
 
         # ALL CODE TO DRAW SHOULD GO BELOW THIS COMMENT
-        current_level.draw(screen)
+        world.draw(screen)
         active_sprite_list.draw(screen)
         hud.draw(screen)
 
@@ -1092,11 +1202,11 @@ def main(world_name):
         hud.hot = data.hot
         player.rect.x = 0
         player.rect.y = 200
-        global WS; WS = 0
-        global VS; VS = -2000
+        world.ws = 0
+        world.vs = -2000
     
     # save
-    current_level.save()
+    world.save()
     
     if restart:
         main(world_name)
