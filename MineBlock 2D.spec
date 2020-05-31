@@ -4,7 +4,7 @@ block_cipher = None
 
 
 a = Analysis(['MineBlock 2D.py'],
-             pathex=['H:\\Python Projects\\MineBlock 2D\\Dev'],
+             pathex=['G:\\Python Projects\\MineBlock 2D\\Dev'],
              binaries=[],
              datas=[],
              hiddenimports=[],

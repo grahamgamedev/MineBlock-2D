@@ -1,5 +1,5 @@
 #define MyAppName "MineBlock 2D"
-#define MyAppVersion "1.4.0"
+#define MyAppVersion "1.5.1"
 #define MyAppPublisher "MineBlock 2D Dev Team"
 #define MyAppURL "http://mineblock2d.ml/"
 #define MyAppExeName "MineBlock 2D.exe"
@@ -37,6 +37,7 @@ Source: ".\dist\Default_skin.png"; DestDir: "{app}"; Flags: ignoreversion
 Source: ".\dist\MineBlock 2D.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: ".\dist\options.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: ".\dist\Readme.html"; DestDir: "{app}"; Flags: ignoreversion
+Source: ".\dist\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: ".\dist\Texture Packs\*"; DestDir: "{app}\Texture Packs"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Dirs]

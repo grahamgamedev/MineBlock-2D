@@ -5,7 +5,7 @@ pyinstaller --onefile --windowed -i "..\icon.ico" "MineBlock 2D.py"
 
 robocopy ".\Texture Packs" ".\dist\Texture Packs" -MIR
 robocopy ".\Worlds" ".\dist\Worlds" -MIR
-robocopy .\ .\dist\ options.txt Readme.html "Arial Black.ttf" Default_skin.png
+robocopy .\ .\dist\ options.txt Readme.html LICENSE "Arial Black.ttf" Default_skin.png
 
 echo Run...
 ".\Dist\MineBlock 2D.exe"
