@@ -23,6 +23,4 @@ GNU General Public License v3.0 In the file LICENSE
 - compile.sh linux compile script (should work).
 - data.py contains various lists and other static data.
 - main.py main python file.
-- options.txt stored options.
-
-
+- options.txt stores options.
